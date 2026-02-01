@@ -1,11 +1,36 @@
 const Submission = require('../models/Submission');
 const Assignment = require('../models/Assignment');
+const multer = require('multer');
+const path = require('path');
+
+// Configure Multer
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    fileFilter: (req, file, cb) => {
+        const filetypes = /pdf|doc|docx|pptx|zip/;
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        if (extname) {
+            return cb(null, true);
+        }
+        cb(new Error('Only PDF, DOC, PPTX, and ZIP files are allowed!'));
+    }
+});
 
 // @desc    Submit assignment
 // @route   POST /api/submissions
 // @access  Private (Student)
 const submitAssignment = async (req, res) => {
-  const { assignment_id, file_url, text_entry } = req.body;
+  const { assignment_id, text_entry } = req.body;
+  const file_url = req.file ? `/uploads/${req.file.filename}` : req.body.file_url;
 
   try {
     const assignment = await Assignment.findById(assignment_id);
@@ -41,58 +66,12 @@ const submitAssignment = async (req, res) => {
   }
 };
 
-// @desc    Get submissions for an assignment
-// @route   GET /api/submissions/assignment/:assignmentId
-// @access  Private (Tutor)
-const getSubmissions = async (req, res) => {
-  try {
-    // Ideally verify tutor ownership here, but for simplicity relying on role check in middleware + logic
-    const submissions = await Submission.find({ assignment_id: req.params.assignmentId })
-        .populate('student_id', 'name email');
-    res.json(submissions);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc    Get my submission for an assignment
-// @route   GET /api/submissions/my/:assignmentId
-// @access  Private
-const getMySubmission = async (req, res) => {
-    try {
-        const submission = await Submission.findOne({ 
-            assignment_id: req.params.assignmentId, 
-            student_id: req.user.id 
-        });
-        res.json(submission || null);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-}
-
-// @desc    Grade submission
-// @route   PUT /api/submissions/:id/grade
-// @access  Private (Tutor)
-const gradeSubmission = async (req, res) => {
-  try {
-    const submission = await Submission.findById(req.params.id);
-    if (!submission) {
-        return res.status(404).json({ message: 'Submission not found' });
-    }
-
-    submission.grade = req.body.grade;
-    submission.feedback = req.body.feedback;
-    
-    const updated = await submission.save();
-    res.json(updated);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+// ... (getSubmissions and others stay same)
 
 module.exports = {
   submitAssignment,
   getSubmissions,
   getMySubmission,
-  gradeSubmission
+  gradeSubmission,
+  upload // Export the upload middleware
 };

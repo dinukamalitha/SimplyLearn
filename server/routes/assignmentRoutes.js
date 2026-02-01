@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { getAssignments, getAssignmentById, createAssignment } = require('../controllers/assignmentController');
+const { getAssignments, getAssignmentById, createAssignment, getStudentAssignments, getTutorAssignments } = require('../controllers/assignmentController');
 const { protect } = require('../middleware/authMiddleware');
 
+router.get('/student/my', protect, getStudentAssignments);
+router.get('/tutor/my', protect, getTutorAssignments);
 router.get('/course/:courseId', protect, getAssignments);
 router.get('/:id', protect, getAssignmentById);
 router.post('/', protect, createAssignment);

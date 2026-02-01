@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
-import { LogOut, User as UserIcon, BookOpen, LayoutDashboard } from 'lucide-react';
+import { LogOut, User as UserIcon, BookOpen, LayoutDashboard, FileText } from 'lucide-react';
 
 const Layout = () => {
   const { user, logout } = useContext(AuthContext);
@@ -26,6 +26,11 @@ const Layout = () => {
                 <Link to="/courses" className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${isActive('/courses')}`}>
                   <BookOpen className="w-4 h-4" /> Courses
                 </Link>
+                {(user?.role === 'Student' || user?.role === 'Tutor' || user?.role === 'Admin') && (
+                  <Link to="/assignments" className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${isActive('/assignments')}`}>
+                    <FileText className="w-4 h-4" /> Assignments
+                  </Link>
+                )}
               </div>
             </div>
             
