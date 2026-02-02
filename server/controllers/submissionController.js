@@ -66,7 +66,50 @@ const submitAssignment = async (req, res) => {
   }
 };
 
-// ... (getSubmissions and others stay same)
+// @desc    Get all submissions for an assignment
+const getSubmissions = async (req, res) => {
+  try {
+    const submissions = await Submission.find({ assignment_id: req.params.assignmentId })
+      .populate('student_id', 'name email');
+    res.json(submissions);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get current user's submission for an assignment
+const getMySubmission = async (req, res) => {
+  try {
+    const submission = await Submission.findOne({
+      assignment_id: req.params.assignmentId,
+      student_id: req.user.id
+    });
+    res.json(submission);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Grade a submission
+const gradeSubmission = async (req, res) => {
+  const { grade, feedback } = req.body;
+
+  try {
+    const submission = await Submission.findById(req.params.id);
+
+    if (!submission) {
+      return res.status(404).json({ message: 'Submission not found' });
+    }
+
+    submission.grade = grade;
+    submission.feedback = feedback;
+    const updatedSubmission = await submission.save();
+
+    res.json(updatedSubmission);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 module.exports = {
   submitAssignment,
