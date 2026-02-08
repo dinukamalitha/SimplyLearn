@@ -1,7 +1,7 @@
 import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import AuthContext from "../context/AuthContext";
-import { LogIn } from "lucide-react";
+import { LogIn, Eye, EyeOff } from "lucide-react";
 
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -10,6 +10,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("Student");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false); // New state for password visibility
   const { login, register } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -26,6 +27,10 @@ const Login = () => {
     } catch (err) {
       setError(err.response?.data?.message || "Authentication failed");
     }
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   return (
@@ -90,18 +95,32 @@ const Login = () => {
               required
             />
           </div>
-          <div>
+          <div className="relative">
             <label className="block mb-2 text-sm font-medium text-gray-300">
               Password
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 text-white placeholder-gray-500 transition-all border border-gray-600 rounded-lg bg-black/20 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter your password"
-              required
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 pr-12 text-white placeholder-gray-500 transition-all border border-gray-600 rounded-lg bg-black/20 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter your password"
+                required
+              />
+              <button
+                type="button"
+                onClick={togglePasswordVisibility}
+                className="absolute text-gray-400 transform -translate-y-1/2 cursor-pointer right-3 top-1/2 hover:text-gray-300 focus:outline-none"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
           <button
             type="submit"
