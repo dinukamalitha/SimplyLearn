@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../auth/User');
 const Course = require('../courses/Course');
 const Assignment = require('../assignments/Assignment');
@@ -10,6 +11,12 @@ const Enrollment = require('./Enrollment');
 const getDashboardStats = async (req, res) => {
     try {
         const { role, id } = req.user;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: "Invalid user id" });
+        }
+
+        const safeUserId = new mongoose.Types.ObjectId(id);
         let stats = {};
 
         if (role === 'Admin') {
@@ -29,7 +36,7 @@ const getDashboardStats = async (req, res) => {
             };
         } else if (role === 'Tutor') {
             // Courses taught by this tutor
-            const myCourses = await Course.find({ tutor_id: id });
+            const myCourses = await Course.find({ tutor_id: safeUserId });
             const courseIds = myCourses.map(c => c._id);
 
             const totalStudents = await Enrollment.countDocuments({ course_id: { $in: courseIds } });
@@ -55,7 +62,7 @@ const getDashboardStats = async (req, res) => {
             };
         } else {
             // Student
-            const enrollments = await Enrollment.find({ student_id: id }).populate('course_id');
+            const enrollments = await Enrollment.find({ student_id: safeUserId }).populate('course_id');
             const enrolledCourseIds = enrollments
                 .map(e => e.course_id?._id)
                 .filter(id => id); // Filter out nulls if a course was deleted
@@ -67,7 +74,7 @@ const getDashboardStats = async (req, res) => {
             });
 
             // My submissions
-            const mySubmissions = await Submission.countDocuments({ student_id: id });
+            const mySubmissions = await Submission.countDocuments({ student_id: safeUserId });
 
             stats = {
                 title: 'Student Dashboard',

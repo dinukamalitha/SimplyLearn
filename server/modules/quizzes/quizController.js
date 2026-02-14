@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Quiz = require('./Quiz');
 const Course = require('../courses/Course');
 

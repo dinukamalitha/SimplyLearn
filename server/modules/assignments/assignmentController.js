@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Assignment = require("./Assignment");
 const Course = require("../courses/Course");
 const Enrollment = require("../engagement/Enrollment");
@@ -32,7 +33,15 @@ const getAssignments = async (req, res) => {
 // @access  Private
 const getAssignmentById = async (req, res) => {
   try {
-    const assignment = await Assignment.findById(req.params.id);
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid assignment id" });
+    }
+
+    const safeId = new mongoose.Types.ObjectId(id);
+
+    const assignment = await Assignment.findById(safeId);
     if (assignment) {
       res.json(assignment);
     } else {
@@ -129,9 +138,9 @@ const getStudentAssignments = async (req, res) => {
           ...assignment.toObject(),
           submission: submission
             ? {
-                submission_date: submission.submission_date,
-                grade: submission.grade,
-              }
+              submission_date: submission.submission_date,
+              grade: submission.grade,
+            }
             : null,
         };
       }),

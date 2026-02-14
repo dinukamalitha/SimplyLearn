@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Course = require('./Course');
 
 // @desc    Get all courses
@@ -17,7 +18,15 @@ const getCourses = async (req, res) => {
 // @access  Private
 const getCourseById = async (req, res) => {
   try {
-    const course = await Course.findById(req.params.id).populate('tutor_id', 'name');
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid course id" });
+    }
+
+    const safeCourseId = new mongoose.Types.ObjectId(id);
+
+    const course = await Course.findById(safeCourseId).populate('tutor_id', 'name');
     if (course) {
       res.json(course);
     } else {
@@ -61,7 +70,15 @@ const createCourse = async (req, res) => {
 // @access  Private (Owner/Admin)
 const updateCourse = async (req, res) => {
   try {
-    const course = await Course.findById(req.params.id);
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid course id" });
+    }
+
+    const safeCourseId = new mongoose.Types.ObjectId(id);
+
+    const course = await Course.findById(safeCourseId);
 
     if (!course) {
       return res.status(404).json({ message: 'Course not found' });

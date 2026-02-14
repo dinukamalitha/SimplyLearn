@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const ForumPost = require('./ForumPost');
 const sanitizeHtml = require('sanitize-html');
 
