@@ -30,38 +30,43 @@ const upload = multer({
 // @access  Private (Student)
 const submitAssignment = async (req, res) => {
   const { assignment_id, text_entry } = req.body;
-  const file_url = req.file ? `/uploads/${req.file.filename}` : req.body.file_url;
+  const file_url = req.file
+    ? `/uploads/${req.file.filename}`
+    : req.body.file_url;
 
   try {
+    // Validate IDs
     if (!mongoose.Types.ObjectId.isValid(assignment_id)) {
       return res.status(400).json({ message: "Invalid assignment id" });
     }
-
     if (!mongoose.Types.ObjectId.isValid(req.user.id)) {
       return res.status(400).json({ message: "Invalid user id" });
     }
 
     const safeAssignmentId = new mongoose.Types.ObjectId(assignment_id);
-    const safeStudentId   = new mongoose.Types.ObjectId(req.user.id);
+    const safeStudentId    = new mongoose.Types.ObjectId(req.user.id);
 
+    // Check assignment exists
     const assignment = await Assignment.findById(safeAssignmentId);
-
     if (!assignment) {
       return res.status(404).json({ message: "Assignment not found" });
     }
 
+    // Sanitize text_entry
+    const sanitizedText = text_entry
+      ? sanitizeHtml(text_entry, { allowedTags: [], allowedAttributes: {} })
+      : "";
+
+    // Check existing submission
     const existingSubmission = await Submission.findOne({
       assignment_id: safeAssignmentId,
       student_id: safeStudentId
     });
 
     if (existingSubmission) {
-      // Update existing
-      existingSubmission.file_url =
-        file_url || existingSubmission.file_url;
-      existingSubmission.text_entry =
-        text_entry || existingSubmission.text_entry;
-      existingSubmission.submission_date = Date.now();
+      existingSubmission.file_url  = file_url || existingSubmission.file_url;
+      existingSubmission.text_entry = sanitizedText || existingSubmission.text_entry;
+      existingSubmission.submission_date = new Date();
 
       await existingSubmission.save();
       return res.json(existingSubmission);
@@ -72,8 +77,8 @@ const submitAssignment = async (req, res) => {
       assignment_id: safeAssignmentId,
       student_id: safeStudentId,
       file_url,
-      text_entry,
-      submission_date: Date.now()
+      text_entry: sanitizedText,
+      submission_date: new Date()
     });
 
     res.status(201).json(submission);
@@ -162,5 +167,5 @@ module.exports = {
   getSubmissions,
   getMySubmission,
   gradeSubmission,
-  upload // Export the upload middleware
+  upload 
 };

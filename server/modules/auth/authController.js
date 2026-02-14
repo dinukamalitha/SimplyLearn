@@ -22,31 +22,26 @@ const registerUser = async (req, res) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/;
     if (!emailRegex.test(normalizedEmail)) {
       return res.status(400).json({ message: "Invalid email format" });
     }
 
-    const safeName =
-      typeof name === "string" ? name.trim() : "";
-
+    const safeName = typeof name === "string" ? name.trim() : "";
     const allowedRoles = ["Student", "Tutor", "Admin"];
     const safeRole = allowedRoles.includes(role) ? role : "Student";
 
-    const userExists = await User.findOne({
-      email: normalizedEmail
-    });
-
+    // Query using trusted value only
+    const userExists = await User.findOne({ email: normalizedEmail });
     if (userExists) {
       return res.status(400).json({ message: "User already exists" });
     }
 
+    // Hash password
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
-    
-    // Create using sanitized values
+    // Create user using sanitized values
     const user = await User.create({
       name: safeName,
       email: normalizedEmail,
@@ -84,7 +79,7 @@ const loginUser = async (req, res) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/;
     if (!emailRegex.test(normalizedEmail)) {
       return res.status(400).json({ message: "Invalid credentials" });
     }

@@ -50,22 +50,29 @@ const createAssignment = async (req, res) => {
   const { course_id, title, instructions, deadline, max_points } = req.body;
 
   try {
-    const course = await Course.findById(course_id);
+    // Validate course_id
+    if (!mongoose.Types.ObjectId.isValid(course_id)) {
+      return res.status(400).json({ message: "Invalid course id" });
+    }
+    const safeCourseId = new mongoose.Types.ObjectId(course_id);
+    const safeUserId = new mongoose.Types.ObjectId(req.user.id);
+
+    // Check if course exists
+    const course = await Course.findById(safeCourseId);
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
     }
 
-    if (
-      course.tutor_id.toString() !== req.user.id &&
-      req.user.role !== "Admin"
-    ) {
-      return res
-        .status(403)
-        .json({ message: "Not authorized to add assignments to this course" });
+    // Check authorization
+    if (course.tutor_id.toString() !== safeUserId.toString() && req.user.role !== "Admin") {
+      return res.status(403).json({
+        message: "Not authorized to add assignments to this course",
+      });
     }
 
+    // Create assignment using trusted values
     const assignment = await Assignment.create({
-      course_id,
+      course_id: safeCourseId,
       title,
       instructions,
       deadline,
