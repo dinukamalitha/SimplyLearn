@@ -27,25 +27,24 @@ const Assignments = () => {
         fetchAssignments();
     }, [user, isTutor]);
 
-    const getStatusInfo = (assignment) => {
-        if (isTutor) {
-            const pending = assignment.submissionStats?.pending || 0;
-            return {
-                label: pending > 0 ? `${pending} Pending Grades` : 'All Graded',
-                color: pending > 0 ? 'text-yellow-400' : 'text-green-400',
-                bgColor: pending > 0 ? 'bg-yellow-400/10 border-yellow-400/30' : 'bg-green-400/10 border-green-400/30',
-                icon: pending > 0 ? Clock : CheckCircle
-            };
-        }
+    const getTutorStatusInfo = (assignment) => {
+        const pending = assignment.submissionStats?.pending || 0;
+        const hasPending = pending > 0;
+        return {
+            label: hasPending ? `${pending} Pending Grades` : 'All Graded',
+            color: hasPending ? 'text-yellow-400' : 'text-green-400',
+            bgColor: hasPending ? 'bg-yellow-400/10 border-yellow-400/30' : 'bg-green-400/10 border-green-400/30',
+            icon: hasPending ? Clock : CheckCircle
+        };
+    };
 
+    const getStudentStatusInfo = (assignment) => {
         const now = new Date();
         const deadline = new Date(assignment.deadline);
-        const isOverdue = now > deadline;
         const submitted = assignment.submission;
 
         if (submitted) {
-            const subDate = new Date(submitted.submission_date);
-            const isLate = subDate > deadline;
+            const isLate = new Date(submitted.submission_date) > deadline;
             return {
                 label: isLate ? 'Submitted Late' : 'Submitted',
                 color: isLate ? 'text-red-400' : 'text-green-400',
@@ -54,12 +53,17 @@ const Assignments = () => {
             };
         }
 
+        const isOverdue = now > deadline;
         return {
             label: isOverdue ? 'Overdue' : 'Pending',
             color: isOverdue ? 'text-red-500' : 'text-yellow-500',
             bgColor: isOverdue ? 'bg-red-500/10 border-red-500/30' : 'bg-yellow-500/10 border-yellow-500/30',
             icon: Clock
         };
+    };
+
+    const getStatusInfo = (assignment) => {
+        return isTutor ? getTutorStatusInfo(assignment) : getStudentStatusInfo(assignment);
     };
 
     if (loading) return <div className="text-white text-center py-20">Loading assignments...</div>;

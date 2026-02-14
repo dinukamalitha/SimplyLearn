@@ -137,60 +137,69 @@ const getProfile = async (req, res) => {
 // @desc    Update user profile
 // @route   PUT /api/auth/profile
 // @access  Private
+
+// Helper: sanitize string or return default
+const sanitizeString = (value, defaultValue = "") =>
+  typeof value === "string" ? value.trim() : defaultValue;
+
+// Helper: sanitize array of strings
+const sanitizeStringArray = (arr, defaultValue = []) =>
+  Array.isArray(arr) ? arr.map((s) => String(s).trim()) : defaultValue;
+
+// Helper: validate email safely
+const isValidEmail = (email) => {
+  if (typeof email !== "string") return false;
+  const normalized = email.trim().toLowerCase();
+  const emailRegex = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/;
+  return emailRegex.test(normalized) ? normalized : false;
+};
+
 const updateProfile = async (req, res) => {
   try {
+    // Validate user ID
     if (!mongoose.Types.ObjectId.isValid(req.user.id)) {
       return res.status(400).json({ message: "Invalid user id" });
     }
 
     const safeUserId = new mongoose.Types.ObjectId(req.user.id);
-
     const user = await User.findById(safeUserId);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    if (user) {
-      // Validate and sanitize inputs from req.body
-      if (req.body.name !== undefined) {
-        user.name = typeof req.body.name === "string" ? req.body.name.trim() : user.name;
-      }
+    // Update basic fields
+    if (req.body.name !== undefined) user.name = sanitizeString(req.body.name, user.name);
 
-      if (req.body.email !== undefined) {
-        if (typeof req.body.email === "string") {
-          const normalizedEmail = req.body.email.trim().toLowerCase();
-          const emailRegex = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/;
-          if (emailRegex.test(normalizedEmail)) {
-            user.email = normalizedEmail;
-          }
-        }
-      }
-
-      if (req.body.password) {
-        const salt = await bcrypt.genSalt(10);
-        user.password_hash = await bcrypt.hash(req.body.password, salt);
-      }
-
-      if (req.body.profile_data && typeof req.body.profile_data === 'object') {
-        const { bio, skills, interests } = req.body.profile_data;
-        user.profile_data = {
-          ...user.profile_data,
-          bio: typeof bio === "string" ? bio.trim() : user.profile_data.bio,
-          skills: Array.isArray(skills) ? skills.map(s => String(s).trim()) : user.profile_data.skills,
-          interests: Array.isArray(interests) ? interests.map(i => String(i).trim()) : user.profile_data.interests,
-        };
-      }
-
-      const updatedUser = await user.save();
-
-      res.json({
-        _id: updatedUser.id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        role: updatedUser.role,
-        profile_data: updatedUser.profile_data,
-        token: generateToken(updatedUser.id),
-      });
-    } else {
-      res.status(404).json({ message: 'User not found' });
+    if (req.body.email !== undefined) {
+      const normalizedEmail = isValidEmail(req.body.email);
+      if (normalizedEmail) user.email = normalizedEmail;
     }
+
+    if (req.body.password) {
+      const salt = await bcrypt.genSalt(10);
+      user.password_hash = await bcrypt.hash(req.body.password, salt);
+    }
+
+    // Update profile_data
+    if (req.body.profile_data && typeof req.body.profile_data === "object") {
+      const { bio, skills, interests } = req.body.profile_data;
+      user.profile_data = {
+        ...user.profile_data,
+        bio: sanitizeString(bio, user.profile_data.bio),
+        skills: sanitizeStringArray(skills, user.profile_data.skills),
+        interests: sanitizeStringArray(interests, user.profile_data.interests),
+      };
+    }
+
+    const updatedUser = await user.save();
+
+    // Return updated user
+    res.json({
+      _id: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      profile_data: updatedUser.profile_data,
+      token: generateToken(updatedUser.id),
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
