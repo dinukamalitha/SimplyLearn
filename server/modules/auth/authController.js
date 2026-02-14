@@ -16,33 +16,55 @@ const registerUser = async (req, res) => {
   const { name, email, password, role } = req.body;
 
   try {
-    const userExists = await User.findOne({ email });
+    // Validate & normalize inputs
+    if (typeof email !== "string") {
+      return res.status(400).json({ message: "Invalid email" });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    const safeName =
+      typeof name === "string" ? name.trim() : "";
+
+    const allowedRoles = ["Student", "Tutor", "Admin"];
+    const safeRole = allowedRoles.includes(role) ? role : "Student";
+
+    const userExists = await User.findOne({
+      email: normalizedEmail
+    });
 
     if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
+      return res.status(400).json({ message: "User already exists" });
     }
 
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
+    
+    // Create using sanitized values
     const user = await User.create({
-      name,
-      email,
+      name: safeName,
+      email: normalizedEmail,
       password_hash,
-      role: role || 'Student',
+      role: safeRole
     });
 
     if (user) {
-      res.status(201).json({
+      return res.status(201).json({
         _id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
-        token: generateToken(user.id),
+        role: user.role
       });
-    } else {
-      res.status(400).json({ message: 'Invalid user data' });
     }
+
+    res.status(400).json({ message: "Invalid user data" });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -55,19 +77,33 @@ const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const user = await User.findOne({ email });
+    // Validate & normalize input
+    if (typeof email !== "string" || typeof password !== "string") {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    // Query using trusted value
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (user && (await bcrypt.compare(password, user.password_hash))) {
-      res.json({
+      return res.json({
         _id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
         token: generateToken(user.id),
       });
-    } else {
-      res.status(400).json({ message: 'Invalid credentials' });
     }
+
+    res.status(401).json({ message: "Invalid email or password" });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

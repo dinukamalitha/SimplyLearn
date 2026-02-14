@@ -1,14 +1,26 @@
-const Assignment = require('./Assignment');
-const Course = require('../courses/Course');
-const Enrollment = require('../engagement/Enrollment');
-const Submission = require('./Submission');
+const Assignment = require("./Assignment");
+const Course = require("../courses/Course");
+const Enrollment = require("../engagement/Enrollment");
+const Submission = require("./Submission");
 
 // @desc    Get assignments for a course
 // @route   GET /api/assignments/course/:courseId
 // @access  Private
 const getAssignments = async (req, res) => {
   try {
-    const assignments = await Assignment.find({ course_id: req.params.courseId });
+    const { courseId } = req.params;
+
+    // Validate the user input
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ message: "Invalid course id" });
+    }
+
+    // Construct query only from validated value
+    const safeCourseId = new mongoose.Types.ObjectId(courseId);
+
+    const assignments = await Assignment.find({
+      course_id: safeCourseId,
+    });
     res.json(assignments);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -24,7 +36,7 @@ const getAssignmentById = async (req, res) => {
     if (assignment) {
       res.json(assignment);
     } else {
-      res.status(404).json({ message: 'Assignment not found' });
+      res.status(404).json({ message: "Assignment not found" });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -40,11 +52,16 @@ const createAssignment = async (req, res) => {
   try {
     const course = await Course.findById(course_id);
     if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
+      return res.status(404).json({ message: "Course not found" });
     }
 
-    if (course.tutor_id.toString() !== req.user.id && req.user.role !== 'Admin') {
-      return res.status(403).json({ message: 'Not authorized to add assignments to this course' });
+    if (
+      course.tutor_id.toString() !== req.user.id &&
+      req.user.role !== "Admin"
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to add assignments to this course" });
     }
 
     const assignment = await Assignment.create({
@@ -52,7 +69,7 @@ const createAssignment = async (req, res) => {
       title,
       instructions,
       deadline,
-      max_points
+      max_points,
     });
 
     res.status(201).json(assignment);
@@ -66,29 +83,33 @@ const createAssignment = async (req, res) => {
 // @access  Private (Student)
 const getStudentAssignments = async (req, res) => {
   try {
-    console.log('Fetching student assignments for:', req.user._id);
+    console.log("Fetching student assignments for:", req.user._id);
     const enrollments = await Enrollment.find({ student_id: req.user._id });
-    const courseIds = enrollments.map(e => e.course_id);
-    console.log('Student course IDs:', courseIds);
+    const courseIds = enrollments.map((e) => e.course_id);
+    console.log("Student course IDs:", courseIds);
 
     const assignments = await Assignment.find({ course_id: { $in: courseIds } })
-      .populate('course_id', 'title')
+      .populate("course_id", "title")
       .sort({ deadline: 1 });
 
     // For each assignment, check if there's a submission
-    const assignmentsWithStatus = await Promise.all(assignments.map(async (assignment) => {
-      const submission = await Submission.findOne({
-        assignment_id: assignment._id,
-        student_id: req.user._id
-      });
-      return {
-        ...assignment.toObject(),
-        submission: submission ? {
-          submission_date: submission.submission_date,
-          grade: submission.grade
-        } : null
-      };
-    }));
+    const assignmentsWithStatus = await Promise.all(
+      assignments.map(async (assignment) => {
+        const submission = await Submission.findOne({
+          assignment_id: assignment._id,
+          student_id: req.user._id,
+        });
+        return {
+          ...assignment.toObject(),
+          submission: submission
+            ? {
+                submission_date: submission.submission_date,
+                grade: submission.grade,
+              }
+            : null,
+        };
+      }),
+    );
 
     res.json(assignmentsWithStatus);
   } catch (error) {
@@ -101,30 +122,34 @@ const getStudentAssignments = async (req, res) => {
 // @access  Private (Tutor)
 const getTutorAssignments = async (req, res) => {
   try {
-    console.log('Fetching tutor assignments for:', req.user._id);
+    console.log("Fetching tutor assignments for:", req.user._id);
     const courses = await Course.find({ tutor_id: req.user._id });
-    const courseIds = courses.map(c => c._id);
-    console.log('Tutor course IDs:', courseIds);
+    const courseIds = courses.map((c) => c._id);
+    console.log("Tutor course IDs:", courseIds);
 
     const assignments = await Assignment.find({ course_id: { $in: courseIds } })
-      .populate('course_id', 'title')
+      .populate("course_id", "title")
       .sort({ deadline: 1 });
 
-    const assignmentsWithStats = await Promise.all(assignments.map(async (assignment) => {
-      const totalSubmissions = await Submission.countDocuments({ assignment_id: assignment._id });
-      const gradedSubmissions = await Submission.countDocuments({
-        assignment_id: assignment._id,
-        grade: { $ne: null }
-      });
+    const assignmentsWithStats = await Promise.all(
+      assignments.map(async (assignment) => {
+        const totalSubmissions = await Submission.countDocuments({
+          assignment_id: assignment._id,
+        });
+        const gradedSubmissions = await Submission.countDocuments({
+          assignment_id: assignment._id,
+          grade: { $ne: null },
+        });
 
-      return {
-        ...assignment.toObject(),
-        submissionStats: {
-          total: totalSubmissions,
-          pending: totalSubmissions - gradedSubmissions
-        }
-      };
-    }));
+        return {
+          ...assignment.toObject(),
+          submissionStats: {
+            total: totalSubmissions,
+            pending: totalSubmissions - gradedSubmissions,
+          },
+        };
+      }),
+    );
 
     res.json(assignmentsWithStats);
   } catch (error) {
@@ -137,5 +162,5 @@ module.exports = {
   getAssignmentById,
   createAssignment,
   getStudentAssignments,
-  getTutorAssignments
+  getTutorAssignments,
 };
