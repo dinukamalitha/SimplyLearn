@@ -329,6 +329,15 @@ const resendOTP = async (req, res) => {
   }
 };
 
+const logoutUser = (req, res) => {
+  res.cookie('token', 'none', {
+    expires: new Date(Date.now() + 10 * 1000),
+    httpOnly: true
+  });
+
+  res.status(200).json({ success: true, data: {} });
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -336,4 +345,5 @@ module.exports = {
   updateProfile,
   verifyEmail,
   resendOTP,
+  logoutUser
 };

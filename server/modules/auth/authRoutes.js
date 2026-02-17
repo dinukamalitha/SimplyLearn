@@ -7,6 +7,7 @@ const {
   updateProfile,
   verifyEmail,
   resendOTP,
+  logoutUser
 } = require("./authController");
 const { protect } = require("../../middleware/authMiddleware");
 
@@ -16,5 +17,6 @@ router.post("/verify-email", verifyEmail);
 router.post("/resend-otp", resendOTP);
 router.get("/profile", protect, getProfile);
 router.put("/profile", protect, require("./authController").updateProfile);
+router.get("/logout", logoutUser);
 
 module.exports = router;

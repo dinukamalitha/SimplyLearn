@@ -4,6 +4,7 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const path = require("path");
 const connectDB = require("./config/db");
+const cookieParser = require("cookie-parser");
 
 dotenv.config();
 
@@ -11,7 +12,7 @@ dotenv.config();
 connectDB();
 
 // 2️⃣ Load all models (VERY IMPORTANT)
-require("./models"); // 👈 create this folder/file
+require("./models");
 
 // 3️⃣ Force-create collections
 const createCollections = async () => {
@@ -31,7 +32,12 @@ createCollections();
 
 const app = express();
 
-app.use(cors());
+app.use(cookieParser());
+
+app.use(cors({
+  origin: 'http://localhost:5173', // Update this if your frontend runs on a different port
+  credentials: true
+}));
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 

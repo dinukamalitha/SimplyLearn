@@ -4,23 +4,28 @@ const User = require('../modules/auth/User');
 const protect = async (req, res, next) => {
   let token;
 
-  if (
+  if (req.cookies.token) {
+    try {
+      token = req.cookies.token;
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      req.user = await User.findById(decoded.id).select('-password_hash');
+      next();
+    } catch (error) {
+      console.error(error);
+      res.status(401).json({ message: 'Not authorized, token failed' });
+    }
+  } else if (
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
   ) {
+    // Keep header check for backward compatibility or mobile apps if needed
     try {
-      // Get token from header
       token = req.headers.authorization.split(' ')[1];
-
-      // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      // Get user from the token
       req.user = await User.findById(decoded.id).select('-password_hash');
-
       next();
     } catch (error) {
-      console.log(error);
+      console.error(error);
       res.status(401).json({ message: 'Not authorized' });
     }
   }
