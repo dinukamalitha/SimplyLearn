@@ -56,10 +56,10 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-[#0073b0] to-black p-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-indigo-900 via-[#0073b0] to-black p-4">
       <div className="w-full max-w-md p-8 border shadow-2xl bg-white/10 backdrop-blur-lg border-white/20 rounded-2xl">
         <div className="flex justify-center mb-6">
-          <div className="p-3 rounded-full bg-gradient-to-r from-black-500 to-blue-500">
+          <div className="p-3 rounded-full bg-linear-to-r from-black-500 to-blue-500">
             <LogIn className="w-8 h-8 text-white" />
           </div>
         </div>
@@ -161,7 +161,7 @@ const Login = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-gradient-to-r from-blue-600 to-blue-600 hover:from-blue-700 hover:to-blue-500 text-white font-bold py-3 rounded-lg shadow-lg transform hover:scale-[1.02] transition-all duration-200"
+            className="w-full bg-linear-to-r from-blue-600 to-blue-600 hover:from-blue-700 hover:to-blue-500 text-white font-bold py-3 rounded-lg shadow-lg transform hover:scale-[1.02] transition-all duration-200"
           >
             {isSubmitting ? "Processing..." : isLogin ? "Sign In" : "Sign Up"}
           </button>
