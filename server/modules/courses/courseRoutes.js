@@ -9,7 +9,7 @@ router.route('/')
 
 router.route('/:id')
     .get(protect, getCourseById)
-    .put(protect, updateCourse)
+    .put(protect, restrictTo('Tutor'), updateCourse)
     .delete(protect, restrictTo('Tutor'), deleteCourse);
 
 module.exports = router;
