@@ -23,14 +23,24 @@ const TakeQuiz = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        let score = 0;
-        quiz.questions.forEach((q, index) => {
-            if (answers[index] === q.correct_option_index) {
-                score++;
-            }
-        });
-        const percentage = (score / quiz.questions.length) * 100;
-        setResult({ score, total: quiz.questions.length, percentage });
+
+        try {
+            // SECURITY FIX: Submit answers to server for validation
+            const { data } = await api.post(`/quizzes/${id}/submit`, {
+                answers
+            });
+
+            // Server returns score, total, percentage
+            setResult({
+                score: data.score,
+                total: data.total,
+                percentage: data.percentage,
+                submitted_at: data.submitted_at
+            });
+        } catch (error) {
+            console.error('Error submitting quiz:', error);
+            alert(error.response?.data?.message || 'Failed to submit quiz. Please try again.');
+        }
     };
 
     if (!quiz) return <div className="text-center py-20 text-white">Loading...</div>;
