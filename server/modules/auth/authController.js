@@ -1,12 +1,13 @@
-const mongoose = require('mongoose');
-const User = require('./User');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+const mongoose = require("mongoose");
+const User = require("./User");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const sendEmail = require("../../utils/sendEmail");
 
 // Generate JWT
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d',
+    expiresIn: "30d",
   });
 };
 
@@ -33,7 +34,7 @@ const registerUser = async (req, res) => {
     const allowedRoles = ["Student", "Tutor", "Admin"];
     const safeRole = allowedRoles.includes(role) ? role : "Student";
 
-    // Check if user already exists 
+    // Check if user already exists
     const userExists = await User.findOne({ email: normalizedEmail });
     if (userExists) {
       return res.status(400).json({ message: "User already exists" });
@@ -43,25 +44,44 @@ const registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
+    // Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp_expires_at = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+
+    console.log(`DEV OTP for ${normalizedEmail}: ${otp}`);
+
     // Create user using sanitized values
     const user = await User.create({
       name: safeName,
       email: normalizedEmail,
       password_hash,
-      role: safeRole
+      role: safeRole,
+      otp_code: otp,
+      otp_expires_at,
+      is_verified: false,
     });
 
     if (user) {
+      try {
+        await sendEmail({
+          to: user.email,
+          subject: "SimplyLearn Email Verification",
+          text: `<h1>Email Verification</h1><p>Your OTP is: <b>${otp}</b></p>`,
+        });
+      } catch (error) {
+        console.error("Email sending failed:", error);
+      }
+
       return res.status(201).json({
         _id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        is_verified: user.is_verified,
       });
     }
 
     res.status(400).json({ message: "Invalid user data" });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -90,6 +110,12 @@ const loginUser = async (req, res) => {
     const user = await User.findOne({ email: normalizedEmail });
 
     if (user && (await bcrypt.compare(password, user.password_hash))) {
+      if (user.is_verified === false) {
+        return res
+          .status(400)
+          .json({ message: "Please verify your email first" });
+      }
+
       return res.json({
         _id: user.id,
         name: user.name,
@@ -100,7 +126,6 @@ const loginUser = async (req, res) => {
     }
 
     res.status(401).json({ message: "Invalid email or password" });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -124,15 +149,15 @@ const getProfile = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        profile_data: user.profile_data
+        profile_data: user.profile_data,
       });
     } else {
-      res.status(404).json({ message: 'User found' });
+      res.status(404).json({ message: "User found" });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-}
+};
 
 // @desc    Update user profile
 // @route   PUT /api/auth/profile
@@ -166,7 +191,8 @@ const updateProfile = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     // Update basic fields
-    if (req.body.name !== undefined) user.name = sanitizeString(req.body.name, user.name);
+    if (req.body.name !== undefined)
+      user.name = sanitizeString(req.body.name, user.name);
 
     if (req.body.email !== undefined) {
       const normalizedEmail = isValidEmail(req.body.email);
@@ -205,9 +231,78 @@ const updateProfile = async (req, res) => {
   }
 };
 
+// @desc    Verify OTP
+// @route   POST /api/auth/verify-email
+// @access  Public
+const verifyEmail = async (req, res) => {
+  const { email, otp } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (user.is_verified)
+      return res.status(400).json({ message: "Email already verified" });
+
+    if (user.otp_code !== otp || user.otp_expires_at < Date.now()) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    user.is_verified = true;
+    user.otp_code = undefined;
+    user.otp_expires_at = undefined;
+    await user.save();
+
+    res.json({
+      _id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user.id),
+      message: "Email verified successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Resend OTP
+// @route   POST /api/auth/resend-otp
+// @access  Public
+const resendOTP = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (user.is_verified)
+      return res.status(400).json({ message: "Email already verified" });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp_expires_at = new Date(Date.now() + 10 * 60 * 1000);
+
+    user.otp_code = otp;
+    user.otp_expires_at = otp_expires_at;
+    await user.save();
+
+    await sendEmail({
+      to: user.email,
+      subject: "SimplyLearn Email Verification (Resend)",
+      text: `<h1>Email Verification</h1><p>Your new OTP is: <b>${otp}</b></p>`,
+    });
+
+    res.json({ message: "OTP resent successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getProfile,
-  updateProfile
+  updateProfile,
+  verifyEmail,
+  resendOTP,
 };

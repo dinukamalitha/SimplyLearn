@@ -41,10 +41,8 @@ export const AuthProvider = ({ children }) => {
       password,
       role,
     });
-    localStorage.setItem("token", data.token);
-    const { data: profile } = await api.get("/auth/profile");
-    setUser(profile);
-    return profile;
+
+    return data;
   };
 
   const logout = () => {
