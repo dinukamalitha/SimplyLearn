@@ -30,6 +30,13 @@ const userSchema = new mongoose.Schema(
     otp_expires_at: {
       type: Date,
     },
+    failed_login_attempts: {
+      type: Number,
+      default: 0,
+    },
+    lock_until: {
+      type: Date,
+    },
     profile_data: {
       avatar: { type: String, default: "" },
       bio: { type: String, default: "" },

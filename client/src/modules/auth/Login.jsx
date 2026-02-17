@@ -12,11 +12,13 @@ const Login = () => {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false); // New state for password visibility
   const { login, register } = useContext(AuthContext);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setIsSubmitting(true);
     try {
       if (isLogin) {
         await login(email, password);
@@ -26,11 +28,26 @@ const Login = () => {
         navigate("/verify-email", { state: { email } });
       }
     } catch (err) {
+      console.error("Login Error:", err);
+
+      // Handle Email Verification Requirement
       if (err.response?.data?.message === "Please verify your email first") {
         navigate("/verify-email", { state: { email } });
         return;
       }
+
+      // Handle Account Lockout (403)
+      if (err.response?.status === 403) {
+        setError(
+          err.response.data.message ||
+            "Account is locked. Please try again later.",
+        );
+        return;
+      }
+
       setError(err.response?.data?.message || "Authentication failed");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -51,8 +68,18 @@ const Login = () => {
         </h2>
 
         {error && (
-          <div className="p-3 mb-4 text-center text-red-100 border border-red-500 rounded-lg bg-red-500/20">
-            {error}
+          <div
+            className={`p-4 mb-6 text-center rounded-xl border ${typeof error === "string" && error.includes("locked") ? "bg-red-500/20 border-red-500 text-red-100 animate-pulse" : "bg-red-500/10 border-red-500/50 text-red-200"}`}
+          >
+            {typeof error === "string" && error.includes("locked") ? (
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-2xl">🔒</span>
+                <span className="text-lg font-bold">Account Locked</span>
+                <span className="text-sm opacity-90">{error}</span>
+              </div>
+            ) : (
+              error
+            )}
           </div>
         )}
 
@@ -70,6 +97,7 @@ const Login = () => {
                   className="w-full px-4 py-3 text-white placeholder-gray-500 transition-all border border-gray-600 rounded-lg bg-black/20 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter your name"
                   required={!isLogin}
+                  disabled={isSubmitting}
                 />
               </div>
               <div>
@@ -79,6 +107,7 @@ const Login = () => {
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
+                  disabled={isSubmitting}
                   className="w-full px-4 py-3 text-white transition-all border border-gray-600 rounded-lg cursor-pointer bg-black/20 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="Student">Student</option>
@@ -98,6 +127,7 @@ const Login = () => {
               className="w-full px-4 py-3 text-white placeholder-gray-500 transition-all border border-gray-600 rounded-lg bg-black/20 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter your email"
               required
+              disabled={isSubmitting}
             />
           </div>
           <div className="relative">
@@ -112,6 +142,7 @@ const Login = () => {
                 className="w-full px-4 py-3 pr-12 text-white placeholder-gray-500 transition-all border border-gray-600 rounded-lg bg-black/20 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter your password"
                 required
+                disabled={isSubmitting}
               />
               <button
                 type="button"
@@ -129,9 +160,10 @@ const Login = () => {
           </div>
           <button
             type="submit"
+            disabled={isSubmitting}
             className="w-full bg-gradient-to-r from-blue-600 to-blue-600 hover:from-blue-700 hover:to-blue-500 text-white font-bold py-3 rounded-lg shadow-lg transform hover:scale-[1.02] transition-all duration-200"
           >
-            {isLogin ? "Sign In" : "Sign Up"}
+            {isSubmitting ? "Processing..." : isLogin ? "Sign In" : "Sign Up"}
           </button>
         </form>
         <div className="mt-6 text-sm text-center text-gray-400">

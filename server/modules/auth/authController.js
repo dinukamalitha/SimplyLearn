@@ -48,7 +48,7 @@ const registerUser = async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otp_expires_at = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
 
-    console.log(`DEV OTP for ${normalizedEmail}: ${otp}`);
+    console.log(`DEV OTP for ${normalizedEmail}: ${otp}`); // For debugging/dev purposes
 
     // Create user using sanitized values
     const user = await User.create({
@@ -78,6 +78,7 @@ const registerUser = async (req, res) => {
         email: user.email,
         role: user.role,
         is_verified: user.is_verified,
+        // token: generateToken(user.id), // Optional: Don't send token if verification required first
       });
     }
 
@@ -109,12 +110,29 @@ const loginUser = async (req, res) => {
     // Query using trusted value
     const user = await User.findOne({ email: normalizedEmail });
 
-    if (user && (await bcrypt.compare(password, user.password_hash))) {
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Check if account is locked
+    if (user.lock_until && user.lock_until > Date.now()) {
+      const waitTime = Math.ceil((user.lock_until - Date.now()) / 60000);
+      return res.status(403).json({
+        message: `Account is temporarily locked. Please try again in ${waitTime} minutes.`,
+      });
+    }
+
+    if (await bcrypt.compare(password, user.password_hash)) {
       if (user.is_verified === false) {
         return res
           .status(400)
           .json({ message: "Please verify your email first" });
       }
+
+      // Reset failed attempts on successful login
+      user.failed_login_attempts = 0;
+      user.lock_until = undefined;
+      await user.save();
 
       return res.json({
         _id: user.id,
@@ -125,6 +143,19 @@ const loginUser = async (req, res) => {
       });
     }
 
+    // Handle failed login attempt
+    user.failed_login_attempts = (user.failed_login_attempts || 0) + 1;
+
+    if (user.failed_login_attempts >= 3) {
+      user.lock_until = new Date(Date.now() + 5 * 60 * 1000); // Lock for 5 minutes
+      await user.save();
+      return res.status(403).json({
+        message:
+          "Account locked due to too many failed login attempts. Please try again in 5 minutes.",
+      });
+    }
+
+    await user.save();
     res.status(401).json({ message: "Invalid email or password" });
   } catch (error) {
     res.status(500).json({ message: error.message });
