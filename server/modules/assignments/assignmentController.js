@@ -11,17 +11,16 @@ const getAssignments = async (req, res) => {
   try {
     const { courseId } = req.params;
 
-    // Validate the user input
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
       return res.status(400).json({ message: "Invalid course id" });
     }
 
-    // Construct query only from validated value
     const safeCourseId = new mongoose.Types.ObjectId(courseId);
 
     const assignments = await Assignment.find({
       course_id: safeCourseId,
     });
+
     res.json(assignments);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -42,11 +41,12 @@ const getAssignmentById = async (req, res) => {
     const safeId = new mongoose.Types.ObjectId(id);
 
     const assignment = await Assignment.findById(safeId);
-    if (assignment) {
-      res.json(assignment);
-    } else {
-      res.status(404).json({ message: "Assignment not found" });
+
+    if (!assignment) {
+      return res.status(404).json({ message: "Assignment not found" });
     }
+
+    res.json(assignment);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -56,27 +56,26 @@ const getAssignmentById = async (req, res) => {
 // @route   POST /api/assignments
 // @access  Private (Tutor)
 const createAssignment = async (req, res) => {
-  const { course_id, title, instructions, deadline, max_points } = req.body;
-
   try {
-    // Validate course_id and user_id
+    const { course_id, title, instructions, deadline, max_points } = req.body;
+
     if (!mongoose.Types.ObjectId.isValid(course_id)) {
       return res.status(400).json({ message: "Invalid course id" });
     }
-    const safeCourseId = new mongoose.Types.ObjectId(course_id);
 
     if (!mongoose.Types.ObjectId.isValid(req.user.id)) {
       return res.status(400).json({ message: "Invalid user id" });
     }
+
+    const safeCourseId = new mongoose.Types.ObjectId(course_id);
     const safeUserId = new mongoose.Types.ObjectId(req.user.id);
 
-    // Check if course exists
     const course = await Course.findById(safeCourseId);
+
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
     }
 
-    // Check authorization
     if (
       course.tutor_id.toString() !== safeUserId.toString() &&
       req.user.role !== "Admin"
@@ -86,19 +85,24 @@ const createAssignment = async (req, res) => {
       });
     }
 
-    // Validate other fields
     const safeTitle = typeof title === "string" ? title.trim() : "";
     const safeInstructions =
       typeof instructions === "string" ? instructions.trim() : "";
-    const safeDeadline = deadline ? new Date(deadline) : null;
+
+    const safeDeadline =
+      deadline && !isNaN(Date.parse(deadline))
+        ? new Date(deadline)
+        : null;
+
     const safeMaxPoints =
-      typeof max_points === "number" && max_points >= 0 ? max_points : 0;
+      Number.isFinite(max_points) && max_points >= 0
+        ? max_points
+        : 0;
 
     if (!safeTitle) {
       return res.status(400).json({ message: "Title is required" });
     }
 
-    // Create assignment using trusted values
     const assignment = await Assignment.create({
       course_id: safeCourseId,
       title: safeTitle,
@@ -118,29 +122,38 @@ const createAssignment = async (req, res) => {
 // @access  Private (Student)
 const getStudentAssignments = async (req, res) => {
   try {
-    console.log("Fetching student assignments for:", req.user._id);
-    const enrollments = await Enrollment.find({ student_id: req.user._id });
-    const courseIds = enrollments.map((e) => e.course_id);
-    console.log("Student course IDs:", courseIds);
+    if (!mongoose.Types.ObjectId.isValid(req.user._id)) {
+      return res.status(400).json({ message: "Invalid user id" });
+    }
 
-    const assignments = await Assignment.find({ course_id: { $in: courseIds } })
+    const safeStudentId = new mongoose.Types.ObjectId(req.user._id);
+
+    const enrollments = await Enrollment.find({
+      student_id: safeStudentId,
+    });
+
+    const courseIds = enrollments.map((e) => e.course_id);
+
+    const assignments = await Assignment.find({
+      course_id: { $in: courseIds },
+    })
       .populate("course_id", "title")
       .sort({ deadline: 1 });
 
-    // For each assignment, check if there's a submission
     const assignmentsWithStatus = await Promise.all(
       assignments.map(async (assignment) => {
         const submission = await Submission.findOne({
           assignment_id: assignment._id,
-          student_id: req.user._id,
+          student_id: safeStudentId,
         });
+
         return {
           ...assignment.toObject(),
           submission: submission
             ? {
-              submission_date: submission.submission_date,
-              grade: submission.grade,
-            }
+                submission_date: submission.submission_date,
+                grade: submission.grade,
+              }
             : null,
         };
       }),
@@ -157,12 +170,21 @@ const getStudentAssignments = async (req, res) => {
 // @access  Private (Tutor)
 const getTutorAssignments = async (req, res) => {
   try {
-    console.log("Fetching tutor assignments for:", req.user._id);
-    const courses = await Course.find({ tutor_id: req.user._id });
-    const courseIds = courses.map((c) => c._id);
-    console.log("Tutor course IDs:", courseIds);
+    if (!mongoose.Types.ObjectId.isValid(req.user._id)) {
+      return res.status(400).json({ message: "Invalid user id" });
+    }
 
-    const assignments = await Assignment.find({ course_id: { $in: courseIds } })
+    const safeTutorId = new mongoose.Types.ObjectId(req.user._id);
+
+    const courses = await Course.find({
+      tutor_id: safeTutorId,
+    });
+
+    const courseIds = courses.map((c) => c._id);
+
+    const assignments = await Assignment.find({
+      course_id: { $in: courseIds },
+    })
       .populate("course_id", "title")
       .sort({ deadline: 1 });
 
@@ -171,6 +193,7 @@ const getTutorAssignments = async (req, res) => {
         const totalSubmissions = await Submission.countDocuments({
           assignment_id: assignment._id,
         });
+
         const gradedSubmissions = await Submission.countDocuments({
           assignment_id: assignment._id,
           grade: { $ne: null },
