@@ -84,7 +84,7 @@ const updateCourse = async (req, res) => {
       return res.status(404).json({ message: 'Course not found' });
     }
 
-    if (course.tutor_id.toString() !== req.user.id && req.user.role !== 'Admin') {
+    if (course.tutor_id.toString() !== req.user.id && req.user.role !== 'Tutor') {
       return res.status(403).json({ message: 'Not authorized to update this course' });
     }
 
@@ -107,9 +107,36 @@ const updateCourse = async (req, res) => {
   }
 }
 
+// @desc    Delete a course
+// @route   DELETE /api/courses/:id
+// @access  Private (Tutor Only)
+const deleteCourse = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid course id" });
+    }
+    const safeCourseId = new mongoose.Types.ObjectId(id);
+    const course = await Course.findById(safeCourseId);
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+    // STRICT CHECK: Only the Tutor owner can delete
+    // Admin access is intentionally omitted per security requirements
+    if (course.tutor_id.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to delete this course' });
+    }
+    await course.deleteOne();
+    res.json({ message: 'Course removed' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getCourses,
   getCourseById,
   createCourse,
-  updateCourse
+  updateCourse,
+  deleteCourse
 };
